@@ -1,10 +1,10 @@
 project(mm-server)
 cmake_minimum_required(VERSION 3.1)
 
-#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-#include(EnableCpp11)
+set(CLIENT_EXEC_NAME "mm-client")
 
-file(GLOB_RECURSE SRC_LIST src/*.c* src/*.h*)
+file(GLOB_RECURSE SERVER_SRC_LIST src/server/*.c* src/server/*.h*)
+file(GLOB_RECURSE CLIENT_SRC_LIST src/client/*.c* src/client/*.h*)
 
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
@@ -19,17 +19,16 @@ include_directories(src)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-option(PACKAGE_TESTS "Build the tests" OFF)
-if(PACKAGE_TESTS)
-	enable_testing()
-	add_library(${PROJECT_NAME}-lib ${SRC_LIST})
-	target_link_libraries(${PROJECT_NAME}-lib ${Boost_LIBRARIES} Threads::Threads)
-	include(GoogleTest)
-	add_subdirectory(test)
-endif()
-
 ################################################################################
 
-add_executable(${PROJECT_NAME} ${SRC_LIST})
+add_executable(${PROJECT_NAME} ${SERVER_SRC_LIST})
+add_executable(${CLIENT_EXEC_NAME} ${CLIENT_SRC_LIST})
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} Threads::Threads)
+target_link_libraries(${CLIENT_EXEC_NAME} ${Boost_LIBRARIES} Threads::Threads)
 
+# Enabling C++14. Add these two lines after add_executable
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+
+set_property(TARGET ${CLIENT_EXEC_NAME} PROPERTY CXX_STANDARD 14)
+set_property(TARGET ${CLIENT_EXEC_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
