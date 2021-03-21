@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+
+.cache
+cmake_build
+.directory
+compile_commands.json
+*.swp
+*.swo
