@@ -5,21 +5,28 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <utility>
 #include <boost/asio/ts/buffer.hpp>
 #include <boost/asio/ts/internet.hpp>
 #include <boost/thread.hpp>
 #include <thread>
 #include <queue>
+#include <condition_variable>
+#include <mutex>
 
-using Mutex = boost::shared_mutex;
+using Mutex = std::mutex;
 
 Mutex mutex;
+
+std::condition_variable cv;
 
 boost::asio::io_context io_context;
 
 std::queue<std::string> request_queue;
 
+
+bool cli_continue;
 
 class TcpClient
 {
@@ -27,11 +34,16 @@ public:
 	TcpClient(const boost::asio::ip::tcp::resolver::results_type& endpoints) :
 	   	_socket(io_context)
 	{
+		cli_continue = true;
 		connect(endpoints);
 	}
 
 	void sendRequest(const std::string& csvMessage)
 	{
+		{
+			std::unique_lock<Mutex> guard(mutex);
+			cli_continue = false;
+		}
 		const auto handler = [this, csvMessage]()
 		{
 			const bool write_in_progress = !request_queue.empty();
@@ -67,16 +79,20 @@ private:
 			{
 				return;
 			}
+			std::unique_lock<Mutex> guard(mutex);
+
 			std::string line;
 			std::istream is(&_response);
-			std::getline(is, line);
 
-			if (!line.empty())
-			{
-				boost::unique_lock<Mutex> guard(mutex);
+			std::cout << std::endl;
+			std::cout << "*********" << std::endl;
 
+			while (std::getline(is, line))
 				std::cout << line << std::endl;
-			}
+
+			std::cout << "*********" << std::endl;
+			cli_continue = true;
+			cv.notify_all();
 			read();
 		};
 
@@ -115,7 +131,7 @@ public:
 	}
 	static void printMenu()
 	{
-		boost::unique_lock<Mutex> guard(mutex);
+		std::unique_lock<Mutex> guard(mutex);
 
 		std::cout << std::endl;
 		std::cout << "Please choose one of these commands:" << std::endl;
@@ -124,7 +140,6 @@ public:
 		std::cout << "3. match" << std::endl;
 		std::cout << "4. logout" << std::endl;
 		std::cout << "Your choice: " << std::flush;
-		std::cout << std::endl;
 	}
 
 	void readInput()
@@ -132,11 +147,26 @@ public:
 		while (true)
 		{
 			using namespace std::chrono_literals;
-			//TODO fix this:
-			std::this_thread::sleep_for(200ms);
+			{
+				std::unique_lock<Mutex> guard(mutex);
+				while (!cli_continue)
+					cv.wait(guard);
+			}
 			printMenu();
 			int choice;
-			std::cin >> choice;
+			std::string choice_str;
+
+			std::getline(std::cin, choice_str);
+			try
+			{
+				choice = std::stoi(choice_str);
+			}
+			catch(...)
+			{
+				std::unique_lock<Mutex> guard(mutex);
+				std::cout << "Invalid choice. Please enter a number between 1 and 4" << std::endl;
+				continue;
+			}
 			switch (choice)
 			{
 				case 1:
@@ -152,7 +182,7 @@ public:
 					_tcp.sendRequest("logout\n");
 					return;
 				default:
-					boost::unique_lock<Mutex> guard(mutex);
+					std::unique_lock<Mutex> guard(mutex);
 					std::cout << "Invalid option." << std::endl;
 			}
 		}
@@ -163,11 +193,10 @@ public:
 		std::string command = "login,";
 
 		{
-			boost::unique_lock<Mutex> guard(mutex);
+			std::unique_lock<Mutex> guard(mutex);
 
 			std::cout << "Name: " << std::flush;
 			std::string input;
-			std::getline(std::cin, input); //discard \n
 			std::getline(std::cin, input);
 			command += input;
 			command += ',';
