@@ -117,18 +117,23 @@ public:
 	{
 		boost::unique_lock<Mutex> guard(mutex);
 
+		std::cout << std::endl;
 		std::cout << "Please choose one of these commands:" << std::endl;
 		std::cout << "1. login" << std::endl;
 		std::cout << "2. list_all" << std::endl;
 		std::cout << "3. match" << std::endl;
 		std::cout << "4. logout" << std::endl;
 		std::cout << "Your choice: " << std::flush;
+		std::cout << std::endl;
 	}
 
 	void readInput()
 	{
 		while (true)
 		{
+			using namespace std::chrono_literals;
+			//TODO fix this:
+			std::this_thread::sleep_for(200ms);
 			printMenu();
 			int choice;
 			std::cin >> choice;
@@ -176,9 +181,7 @@ public:
 			command += '\n';
 		}
 
-		std::cout << "before" << std::endl;
 		_tcp.sendRequest(command);
-		std::cout << "after" << std::endl;
 	}
 private:
 	TcpClient& _tcp;
