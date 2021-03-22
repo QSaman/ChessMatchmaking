@@ -28,6 +28,17 @@ std::queue<std::string> request_queue;
 
 bool cli_continue;
 
+void printMenu()
+{
+	std::cout << std::endl;
+	std::cout << "Please choose one of these commands:" << std::endl;
+	std::cout << "1. login" << std::endl;
+	std::cout << "2. list_all" << std::endl;
+	std::cout << "3. match" << std::endl;
+	std::cout << "4. logout" << std::endl;
+	std::cout << "Your choice: " << std::flush;
+}
+
 class TcpClient
 {
 public:
@@ -36,6 +47,12 @@ public:
 	{
 		cli_continue = true;
 		connect(endpoints);
+	}
+
+	void close()
+	{
+		_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+		_socket.close();
 	}
 
 	void sendRequest(const std::string& csvMessage)
@@ -84,6 +101,8 @@ private:
 			std::string line;
 			std::istream is(&_response);
 
+			if (cli_continue)
+				std::cout << std::endl;
 			std::cout << std::endl;
 			std::cout << "*********" << std::endl;
 
@@ -91,12 +110,20 @@ private:
 				std::cout << line << std::endl;
 
 			std::cout << "*********" << std::endl;
-			cli_continue = true;
+			if (cli_continue)
+				printMenu();
+			else
+				cli_continue = true;
 			cv.notify_all();
 			read();
 		};
 
 		boost::asio::async_read_until(_socket, _response, "\n", handler);
+	}
+
+	void printMenu()
+	{
+		::printMenu();
 	}
 
 	void write()
@@ -129,18 +156,6 @@ public:
 	StdinClient(TcpClient& tcp) : _tcp(tcp)
 	{
 	}
-	static void printMenu()
-	{
-		std::unique_lock<Mutex> guard(mutex);
-
-		std::cout << std::endl;
-		std::cout << "Please choose one of these commands:" << std::endl;
-		std::cout << "1. login" << std::endl;
-		std::cout << "2. list_all" << std::endl;
-		std::cout << "3. match" << std::endl;
-		std::cout << "4. logout" << std::endl;
-		std::cout << "Your choice: " << std::flush;
-	}
 
 	void readInput()
 	{
@@ -151,8 +166,8 @@ public:
 				std::unique_lock<Mutex> guard(mutex);
 				while (!cli_continue)
 					cv.wait(guard);
+				printMenu();
 			}
-			printMenu();
 			int choice;
 			std::string choice_str;
 
@@ -180,6 +195,12 @@ public:
 					break;
 				case 4:
 					_tcp.sendRequest("logout\n");
+
+					{
+						std::unique_lock<Mutex> guard(mutex);
+						while (!cli_continue)
+							cv.wait(guard);
+					}
 					return;
 				default:
 					std::unique_lock<Mutex> guard(mutex);
@@ -228,5 +249,6 @@ int main(int argc, char* argv[])
 
 	std::thread t([](){io_context.run();});
 	stdin_client.readInput();
+	tcp_client.close();
 	t.join();
 }
