@@ -68,12 +68,15 @@ private:
 				return;
 			}
 			std::string line;
-			std::istream is(&_request);
+			std::istream is(&_response);
 			std::getline(is, line);
 
-			boost::unique_lock<Mutex> guard(mutex);
+			if (!line.empty())
+			{
+				boost::unique_lock<Mutex> guard(mutex);
 
-			std::cout << line << std::endl;
+				std::cout << line << std::endl;
+			}
 			read();
 		};
 
@@ -152,25 +155,30 @@ public:
 
 	void loginRequest()
 	{
-		boost::unique_lock<Mutex> guard(mutex);
-
 		std::string command = "login,";
-		std::cout << "Name: " << std::flush;
-		std::string input;
-		std::getline(std::cin, input); //discard \n
-		std::getline(std::cin, input);
-		command += input;
-		command += ',';
-		std::cout << "Country: " << std::flush;
-		std::getline(std::cin, input);
-		command += input;
-		command += ',';
-		std::cout << "Rating: " << std::flush;
-		std::getline(std::cin, input);
-		command += input;
-		command += '\n';
 
+		{
+			boost::unique_lock<Mutex> guard(mutex);
+
+			std::cout << "Name: " << std::flush;
+			std::string input;
+			std::getline(std::cin, input); //discard \n
+			std::getline(std::cin, input);
+			command += input;
+			command += ',';
+			std::cout << "Country: " << std::flush;
+			std::getline(std::cin, input);
+			command += input;
+			command += ',';
+			std::cout << "Rating: " << std::flush;
+			std::getline(std::cin, input);
+			command += input;
+			command += '\n';
+		}
+
+		std::cout << "before" << std::endl;
 		_tcp.sendRequest(command);
+		std::cout << "after" << std::endl;
 	}
 private:
 	TcpClient& _tcp;
